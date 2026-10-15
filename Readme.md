@@ -144,4 +144,4 @@ curl localhost:8080/api/profile -H "Authorization: Bearer $TOKEN"
 
 ## Auteur
 
-**Zakariyae** : Cycle Ingénieur Cybersécurité, ENSET Mohammedia
+**Zakariyae Belagraa** : Cycle Ingénieur Cybersécurité, ENSET Mohammedia
