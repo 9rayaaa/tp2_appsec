@@ -1,88 +1,42 @@
-# JWT Demo : Authentification avec Spring Boot & Spring Security
+# JWT Demo API
 
-API REST sécurisée par **JWT (JSON Web Token)** avec Spring Boot, Spring Security, JPA et une base H2 en mémoire.
+> API REST d’authentification construite avec Spring Boot et Spring Security. Les utilisateurs peuvent créer un compte, se connecter et accéder aux routes protégées avec un jeton JWT.
+
+## Sommaire
+
+- [Fonctionnalités](#fonctionnalités)
+- [Technologies](#technologies)
+- [Démarrage](#démarrage)
+- [Configuration](#configuration)
+- [Routes de l’API](#routes-de-lapi)
+- [Exemples d’utilisation](#exemples-dutilisation)
+- [Structure du projet](#structure-du-projet)
+- [Sécurité](#sécurité)
+- [Auteur](#auteur)
 
 ## Fonctionnalités
 
-- Inscription d'un utilisateur (mot de passe haché avec BCrypt)
-- Connexion et génération d'un token JWT signé (HMAC-SHA)
-- Filtre JWT validant le token à chaque requête
-- Routes `/auth/**` publiques, routes `/api/**` protégées
-- Sessions stateless
+- Inscription avec mot de passe haché par BCrypt
+- Authentification et génération de jetons JWT signés
+- Vérification des jetons à chaque requête protégée
+- Stockage des utilisateurs dans une base H2 en mémoire
+- Sessions Spring Security sans état (*stateless*)
 
 ## Technologies
 
-| Technologie | Rôle |
+| Outil | Version / usage |
 |---|---|
-| Java 17+ | Langage |
-| Spring Boot 3.x | Framework |
-| Spring Security | Authentification / autorisation |
-| Spring Data JPA | Accès aux données |
-| H2 (in-memory) | Base de données |
-| jjwt 0.13.0 | Génération et validation des JWT |
-| Maven | Gestion des dépendances |
+| Java | 21 |
+| Spring Boot | 3.4.13 |
+| Spring Security | Authentification et autorisation |
+| Spring Data JPA | Persistance des utilisateurs |
+| H2 | Base de données en mémoire |
+| JJWT | 0.13.0, création et validation des jetons |
+| Maven | Compilation et lancement |
 
-## Architecture du projet
+## Démarrage
 
-```
-com.test.seance2
-├── config
-│   └── SecurityConfig
-├── controller
-│   ├── AuthController
-│   └── UserController
-├── dto
-│   ├── AuthResponse
-│   ├── LoginRequest
-│   └── RegisterRequest
-├── entity
-│   └── AppUser
-├── repository
-│   └── UserRepository
-├── security
-│   ├── JwtFilter
-│   └── JwtService
-├── service
-│   └── CustomUserDetailsService
-└── JwtDemoApplication
-```
-
-## Configuration
-
-Fichier `src/main/resources/application.properties` :
-
-```properties
-spring.datasource.url=jdbc:h2:mem:securitydb
-spring.jpa.hibernate.ddl-auto=update
-spring.h2.console.enabled=true
-spring.h2.console.path=/h2-console
-
-jwt.secret=<clé en Base64>
-jwt.expiration=3600000   # 1 heure en millisecondes
-```
-
-Dépendances JWT dans `pom.xml` : `jjwt-api`, `jjwt-impl`, `jjwt-jackson` (0.13.0).
-
-## Fonctionnement
-
-1. `POST /auth/register` : le mot de passe est haché avec BCrypt puis stocké.
-2. `POST /auth/login` : `AuthenticationManager` vérifie les identifiants, `JwtService` génère un token signé.
-3. Le client envoie le token dans l'en-tête `Authorization: Bearer <token>`.
-4. `JwtFilter` vérifie la signature et l'expiration, puis place l'utilisateur dans le `SecurityContext`.
-5. Les routes `/api/**` ne sont accessibles qu'aux utilisateurs authentifiés.
-
-| Classe | Rôle |
-|---|---|
-| `AppUser` | Entité JPA (id, email unique, password, role) |
-| `UserRepository` | `findByEmail`, `existsByEmail` |
-| `CustomUserDetailsService` | Charge l'utilisateur pour Spring Security |
-| `JwtService` | Génère, parse et valide les tokens |
-| `JwtFilter` | Filtre exécuté une fois par requête |
-| `SecurityConfig` | Règles d'accès, STATELESS, BCrypt |
-| `AuthController` | `/auth/register` et `/auth/login` |
-| `UserController` | `/api/hello` et `/api/profile` |
-
-## Lancement
+Clonez le dépôt et lancez l’application :
 
 ```bash
 git clone https://github.com/K4YR0/TP2_AppSec.git
@@ -90,58 +44,99 @@ cd TP2_AppSec
 ./mvnw spring-boot:run
 ```
 
-L'application démarre sur `http://localhost:8080`.
+L’API démarre à l’adresse `http://localhost:8080`.
 
-## Tests avec curl
+## Configuration
 
-### 1. Inscription
+Les paramètres se trouvent dans `src/main/resources/application.properties`. La configuration actuelle utilise H2 en mémoire et expose la console H2 sur `/h2-console`.
+
+```properties
+spring.datasource.url=jdbc:h2:mem:securitydb
+spring.jpa.hibernate.ddl-auto=update
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+jwt.secret=<clé encodée en Base64>
+jwt.expiration=3600000
+```
+
+La durée du jeton est exprimée en millisecondes ; `3600000` correspond à une heure. La clé d’exemple du dépôt est réservée au développement. Utilisez un secret externe et privé pour tout déploiement.
+
+## Routes de l’API
+
+| Méthode | Route | Accès | Description |
+|---|---|---|---|
+| `POST` | `/auth/register` | Public | Crée un compte utilisateur |
+| `POST` | `/auth/login` | Public | Vérifie les identifiants et retourne un JWT |
+| `GET` | `/api/public` | Public | Retourne une réponse de démonstration publique |
+| `GET` | `/api/hello` | Protégé | Retourne un message de bienvenue |
+| `GET` | `/api/profile` | Protégé | Retourne l’identité de l’utilisateur connecté |
+| `GET` | `/api/private` | Protégé | Retourne une réponse de démonstration protégée |
+
+Les routes protégées attendent un en-tête `Authorization: Bearer <token>`.
+
+## Exemples d’utilisation
+
+### 1. Créer un compte
 
 ```bash
-curl -X POST localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/auth/register \
+  -H 'Content-Type: application/json' \
   -d '{"email":"a@a.com","password":"1234"}'
 ```
 
-![Inscription](docs/images/01-register.png)
+![Réponse à l’inscription](docs/images/01-register.png)
 
-### 2. Connexion
+### 2. Se connecter
 
 ```bash
-curl -X POST localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
+curl -X POST http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
   -d '{"email":"a@a.com","password":"1234"}'
 ```
 
-Le token retourné est ensuite utilisé dans les requêtes protégées.
+La réponse contient le jeton à transmettre aux routes protégées.
 
-![Connexion](docs/images/02-login.png)
+![Réponse à la connexion](docs/images/02-login.png)
 
-### 3. Accès sans token (refusé)
-
-```bash
-curl -i localhost:8080/api/hello
-```
-
-![Sans token](docs/images/03-sans-token.png)
-
-### 4. Accès avec token (autorisé)
+### 3. Appeler une route protégée sans jeton
 
 ```bash
-TOKEN=<coller_le_token>
-curl localhost:8080/api/hello -H "Authorization: Bearer $TOKEN"
-curl localhost:8080/api/profile -H "Authorization: Bearer $TOKEN"
+curl -i http://localhost:8080/api/hello
 ```
 
-![Avec token](docs/images/04-avec-token.png)
+![Réponse sans jeton](docs/images/03-sans-token.png)
 
-## Points de sécurité
+### 4. Appeler les routes protégées avec un jeton
 
-- Externaliser le secret JWT (variable d'environnement, vault), ne jamais le commiter.
-- Désactiver la console H2 et `show-sql` en production.
-- Le `catch` vide dans `JwtFilter` masque les erreurs : ajouter un log et une réponse 401.
-- Prévoir refresh token et révocation.
-- Valider les entrées (`@Valid`, politique de mot de passe).
+```bash
+TOKEN='<coller-le-jeton-reçu-à-la-connexion>'
+curl http://localhost:8080/api/hello -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8080/api/profile -H "Authorization: Bearer $TOKEN"
+```
+
+![Réponse avec jeton](docs/images/04-avec-token.png)
+
+## Structure du projet
+
+```text
+src/main/java/com/test/seance2/
+├── config/       Configuration Spring Security
+├── controller/   Contrôleurs d’authentification et de démonstration
+├── dto/          Objets d’entrée et de réponse
+├── entity/       Entité utilisateur
+├── repository/   Accès aux utilisateurs
+├── security/     Filtre et service JWT
+└── service/      Chargement des utilisateurs
+```
+
+## Sécurité
+
+- Gardez le secret JWT hors du dépôt et fournissez-le par variable d’environnement ou gestionnaire de secrets.
+- Désactivez la console H2 et les journaux SQL en production.
+- Ajoutez une validation des entrées et une politique de mot de passe adaptée.
+- Pour une application en production, prévoyez la gestion du renouvellement et de la révocation des jetons.
 
 ## Auteur
 
-**Zakariyae Belagraa** : Cycle Ingénieur Cybersécurité, ENSET Mohammedia
+**machnaoui abdellatif** — Cycle ingénieur en cybersécurité, ENSET Mohammedia
